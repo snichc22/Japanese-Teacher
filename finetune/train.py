@@ -2,11 +2,11 @@ from pathlib import Path
 
 import torch.cuda
 from datasets import load_dataset
-from transformers import AutoTokenizer, BitsAndBytesConfig, AutoModelForCausalLM, TrainingArguments
+from transformers import AutoTokenizer, AutoConfig, BitsAndBytesConfig, Qwen3_5ForCausalLM
 from peft import prepare_model_for_kbit_training, LoraConfig, get_peft_model
-from trl import SFTTrainer
+from trl import SFTTrainer, SFTConfig
 
-BASE_MODEL = ""
+BASE_MODEL = "Qwen/Qwen3.5-9B-Base"
 DATASET_PATH = "finetune/train_data.jsonl"
 OUTPUT_DIR = "finetune/output"
 LORA_OUTPUT = "finetune/lora_adapter"
@@ -32,8 +32,12 @@ def main():
         bnb_4bit_use_double_quant=True
     )
 
-    model = AutoModelForCausalLM.from_pretrained(
+    config = AutoConfig.from_pretrained(BASE_MODEL, trust_remote_code=True)
+    text_config = config.text_config
+
+    model = Qwen3_5ForCausalLM.from_pretrained(
         BASE_MODEL,
+        config=text_config,
         quantization_config=bnb_config,
         device_map="auto",
         trust_remote_code=True,
@@ -56,7 +60,7 @@ def main():
         ],
         lora_dropout=0.05,
         bias="none",
-        task_type="CASUAL_LM"
+        task_type="CAUSAL_LM"
     )
 
     model = get_peft_model(model, lora_config)
@@ -65,7 +69,7 @@ def main():
     dataset = load_dataset("json", data_files=DATASET_PATH, split="train")
     print(f"Training examples: {len(dataset)}")
 
-    training_args = TrainingArguments(
+    training_args = SFTConfig(
         output_dir=OUTPUT_DIR,
         num_train_epochs=EPOCHS,
         per_device_train_batch_size=BATCH_SIZE,
@@ -82,14 +86,14 @@ def main():
         gradient_checkpointing=True,
         max_grad_norm=0.3,
         report_to="none",               # "wandb" for logging
+        max_length=MAX_SEQ_LENGTH,
     )
 
     trainer = SFTTrainer(
         model=model,
-        tokenizer=tokenizer,
+        processing_class=tokenizer,
         args=training_args,
         train_dataset=dataset,
-        max_seq_length=MAX_SEQ_LENGTH
     )
 
     print(f"Starting fine-tuning...")
