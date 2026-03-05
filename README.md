@@ -121,7 +121,9 @@ cd finetune
 python prepare_data.py
 ```
 
-This generates `train_data.jsonl` with example teacher–student conversations. Edit [`finetune/prepare_data.py`](finetune/prepare_data.py) to add more training examples (200–500+ recommended).
+This generates `train_data.jsonl` with example teacher–student conversations. 
+
+Edit [`finetune/prepare_data.py`](finetune/prepare_data.py) to add more training examples.
 
 ### 2. Train the LoRA Adapter
 
@@ -180,3 +182,8 @@ ollama run japanese-teacher-ft
 
 - **GPU**: NVIDIA RTX 4080 Laptop
 - **RAM**: 32GB
+
+---
+
+## Performance
+
