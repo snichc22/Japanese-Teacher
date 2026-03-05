@@ -15,3 +15,5 @@ venv/
 .ollama/
 
 models/
+
+Modelfile.finetuned

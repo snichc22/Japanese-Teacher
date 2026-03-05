@@ -1,6 +1,5 @@
 Write-Host "Starting Japanese Teacher..." -ForegroundColor Cyan
 
-# Check if Ollama is running
 $ollamaRunning = Get-Process -Name "ollama" -ErrorAction SilentlyContinue
 if (-not $ollamaRunning) {
     Write-Host "Starting Ollama..." -ForegroundColor Yellow
