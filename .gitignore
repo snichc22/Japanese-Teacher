@@ -9,11 +9,9 @@ __pycache__/
 .venv/
 venv/
 
-.env
+.env.teacher
 
 *.gguf
 .ollama/
 
 models/
-
-Modelfile.finetuned

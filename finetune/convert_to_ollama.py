@@ -1,27 +1,101 @@
 import subprocess
+import shutil
+import sys
+from pathlib import Path
 
 import torch
+from dotenv import load_dotenv
 from peft import PeftModel
-from transformers import AutoModelForCausalLM, AutoTokenizer
+from transformers import AutoConfig, Qwen3_5ForCausalLM, AutoTokenizer
+
+SCRIPT_DIR = Path(__file__).resolve().parent
+PROJECT_ROOT = SCRIPT_DIR.parent
+
+load_dotenv(PROJECT_ROOT / ".env.teacher")
 
 BASE_MODEL = "Qwen/Qwen3.5-9B-Base"
-LORA_ADAPTER = "finetune/lora_adapter"
-MERGED_OUTPUT = "finetune/merged_model"
+LORA_ADAPTER = "lora_adapter"
+MERGED_OUTPUT = "merged_model"
+GGUF_OUTPUT = "merged_model.gguf"
+GGUF_OUTTYPE = "f16"
+
+def find_llama_cpp_converter():
+    converter = shutil.which("convert_hf_to_gguf")
+    if converter:
+        return [converter]
+
+    candidates = [
+        PROJECT_ROOT / "llama.cpp" / "convert_hf_to_gguf.py",
+        Path.home() / "llama.cpp" / "convert_hf_to_gguf.py",
+    ]
+    for p in candidates:
+        if p.exists():
+            return [sys.executable, str(p.resolve())]
+
+    return None
+
 
 def merge_and_export():
-    model = AutoModelForCausalLM.from_pretrained(
+    config = AutoConfig.from_pretrained(BASE_MODEL, trust_remote_code=True)
+    text_config = config.text_config
+
+    model = Qwen3_5ForCausalLM.from_pretrained(
         BASE_MODEL,
+        config=text_config,
         torch_dtype=torch.bfloat16,
-        device_map="auto",
+        device_map="cpu",
         trust_remote_code=True
     )
-    tokenizer = AutoTokenizer.from_pretrained(model, LORA_ADAPTER)
+    tokenizer = AutoTokenizer.from_pretrained(BASE_MODEL, trust_remote_code=True)
 
-    model = PeftModel.from_pretrained(model, LORA_ADAPTER)
+    # Workaround: transformers 5.x stores _no_split_modules as a set, but
+    # accelerate 1.13 chokes on it in get_balanced_memory(). Flatten to list.
+    if hasattr(model, "_no_split_modules") and isinstance(model._no_split_modules, set):
+        model._no_split_modules = list(model._no_split_modules)
+
+    print("Loading LoRA adapter and merging with base model...")
+    model = PeftModel.from_pretrained(model, LORA_ADAPTER, device_map="cpu")
     model = model.merge_and_unload()
-    model.save_pretrained(MERGED_OUTPUT)
 
-    modelfile_content = f"""FROM {MERGED_OUTPUT}
+    print(f"Saving merged model to {MERGED_OUTPUT}...")
+    model.save_pretrained(MERGED_OUTPUT)
+    tokenizer.save_pretrained(MERGED_OUTPUT)
+
+    # --- Convert to GGUF format ---
+    # Ollama cannot directly import Qwen3.5 safetensors (unsupported architecture).
+    # We must convert to GGUF first using llama.cpp's converter.
+    print(f"Converting merged model to GGUF format (outtype={GGUF_OUTTYPE})...")
+    gguf_path = Path(GGUF_OUTPUT)
+
+    convert_cmd = find_llama_cpp_converter()
+    if convert_cmd is None:
+        print("ERROR: Could not find convert_hf_to_gguf.py!")
+        print("Expected it at: " + str(PROJECT_ROOT / "llama.cpp" / "convert_hf_to_gguf.py"))
+        print("\nTo fix this:")
+        print(f"  cd \"{PROJECT_ROOT}\"")
+        print("  git clone https://github.com/ggml-org/llama.cpp")
+        print("  pip install gguf")
+        sys.exit(1)
+
+    convert_args = convert_cmd + [
+        MERGED_OUTPUT,
+        "--outfile", str(gguf_path),
+        "--outtype", GGUF_OUTTYPE,
+    ]
+
+    print(f"Running: {' '.join(convert_args)}")
+    result = subprocess.run(convert_args)
+
+    if result.returncode != 0:
+        print("GGUF conversion failed!")
+        print(f"\nYou can try manually converting:")
+        print(f"  cd \"{SCRIPT_DIR}\"")
+        print(f"  python \"{PROJECT_ROOT / 'llama.cpp' / 'convert_hf_to_gguf.py'}\" {MERGED_OUTPUT} --outfile {GGUF_OUTPUT} --outtype {GGUF_OUTTYPE}")
+        sys.exit(1)
+
+    print(f"GGUF conversion complete: {gguf_path}")
+
+    modelfile_content = f"""FROM finetune/{gguf_path}
     
 PARAMETER temperature 0.7
 PARAMETER num_ctx 8192
@@ -45,11 +119,12 @@ Your responsibilities:
 \"\"\"
 """
 
-    with open("Modelfile.finetuned", "w") as f:
+    with open("../Modelfile.finetuned", "w", encoding="utf-8") as f:
         f.write(modelfile_content)
 
+    print("Creating Ollama model...")
     subprocess.run(
-        ["ollama", "create", "japanese-teacher-ft", "-f", "Modelfile.finetuned"],
+        ["ollama", "create", "japanese-teacher-ft", "-f", "../Modelfile.finetuned"],
         check=True
     )
     print("Model merged and exported to Ollama as 'japanese-teacher-ft'.")

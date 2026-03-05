@@ -121,7 +121,7 @@ def create_training_examples():
         # - Kansai-ben / dialects
     ]
 
-    with open("finetune/train_data.jsonl", "w", encoding="utf-8") as f:
+    with open("train_data.jsonl", "w", encoding="utf-8") as f:
         for ex in examples:
             f.write(json.dumps(ex, ensure_ascii=False) + "\n")
 

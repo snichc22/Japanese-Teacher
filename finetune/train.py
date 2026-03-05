@@ -2,14 +2,17 @@ from pathlib import Path
 
 import torch.cuda
 from datasets import load_dataset
+from dotenv import load_dotenv
 from transformers import AutoTokenizer, AutoConfig, BitsAndBytesConfig, Qwen3_5ForCausalLM
 from peft import prepare_model_for_kbit_training, LoraConfig, get_peft_model
 from trl import SFTTrainer, SFTConfig
 
+load_dotenv(Path(__file__).resolve().parent.parent / ".env.teacher")
+
 BASE_MODEL = "Qwen/Qwen3.5-9B-Base"
-DATASET_PATH = "finetune/train_data.jsonl"
-OUTPUT_DIR = "finetune/output"
-LORA_OUTPUT = "finetune/lora_adapter"
+DATASET_PATH = "train_data.jsonl"
+OUTPUT_DIR = "output"
+LORA_OUTPUT = "lora_adapter"
 
 MAX_SEQ_LENGTH = 2048
 BATCH_SIZE = 4
@@ -44,6 +47,11 @@ def main():
         torch_dtype=torch.bfloat16
     )
 
+    # Workaround: transformers 5.x stores _no_split_modules as a set, but
+    # accelerate 1.13 chokes on it in get_balanced_memory(). Flatten to list.
+    if hasattr(model, "_no_split_modules") and isinstance(model._no_split_modules, set):
+        model._no_split_modules = list(model._no_split_modules)
+
     model = prepare_model_for_kbit_training(model)
 
     lora_config = LoraConfig(
@@ -76,7 +84,7 @@ def main():
         gradient_accumulation_steps=GRADIENT_ACCUM,
         learning_rate=LEARNING_RATE,
         weight_decay=0.01,
-        warmup_ratio=0.1,
+        warmup_steps=0.1,
         lr_scheduler_type="cosine",
         logging_steps=10,
         save_steps=50,
