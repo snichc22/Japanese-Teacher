@@ -84,13 +84,13 @@ def main():
         gradient_accumulation_steps=GRADIENT_ACCUM,
         learning_rate=LEARNING_RATE,
         weight_decay=0.01,
-        warmup_steps=0.1,
+        warmup_steps=0.1,               # fraction of total steps used for LR warmup (transformers 5.x: float = ratio)
         lr_scheduler_type="cosine",
         logging_steps=10,
         save_steps=50,
         save_total_limit=3,
         bf16=True,                      # Use bfloat16 (RTX 30xx/40xx)
-        optim="paged_adamw_8bit",       # Memory-efficient optimizer
+        optim="adamw_torch_fused",      # paged_adamw_8bit crashes on Windows (bitsandbytes CUDA init bug)
         gradient_checkpointing=True,
         max_grad_norm=0.3,
         report_to="none",               # "wandb" for logging
