@@ -2,8 +2,8 @@ import os
 import torch
 
 from langchain_community.document_loaders import PyPDFLoader, TextLoader, DirectoryLoader
-from langchain_community.embeddings import HuggingFaceEmbeddings
 from langchain_community.vectorstores import Chroma
+from langchain_huggingface import HuggingFaceEmbeddings
 from langchain_text_splitters import RecursiveCharacterTextSplitter
 
 DOCUMENT_DIR = os.getenv("DOCUMENT_DIR", "documents")

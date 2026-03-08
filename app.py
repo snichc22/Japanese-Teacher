@@ -1,12 +1,18 @@
 import os
 import shutil
+from pathlib import Path
 
 import gradio
+from dotenv import load_dotenv
 from langchain_core.messages import HumanMessage, AIMessage
-from torchvision import message
 
 from src.agent import create_agent
 from src.rag import DOCUMENT_DIR, ingest_documents
+
+SCRIPT_DIR = Path(__file__).resolve().parent
+PROJECT_ROOT = SCRIPT_DIR.parent
+
+load_dotenv(PROJECT_ROOT / ".env.teacher")
 
 agent = create_agent()
 
@@ -35,7 +41,6 @@ def ingest_files(files):
 
 with gradio.Blocks(
     title="Japanese Teacher",
-    theme=gradio.themes.Soft(),
 ) as demo:
     gradio.Markdown("# Japanese Teacher")
     gradio.Markdown(
@@ -45,7 +50,6 @@ with gradio.Blocks(
 
     chatbot = gradio.ChatInterface(
         fn=respond,
-        type="messages",
         examples=[
             "Teach me common Japanese slang",
             "「木漏れ日」とはどういう意味ですか？英語で説明してください",
@@ -65,4 +69,4 @@ with gradio.Blocks(
         ingest_button.click(ingest_files, inputs=file_upload, outputs=ingest_output)
 
 if __name__ == "__main__":
-    demo.launch(server_name="0.0.0.0", server_port=7860)
+    demo.launch(server_name="0.0.0.0", server_port=7860, theme=gradio.themes.Soft())
