@@ -24,9 +24,18 @@ def main():
     print(f"GPU: {torch.cuda.get_device_name(0)}")
     print(f"VRAM: {torch.cuda.get_device_properties(0).total_memory / 1e9:.2f} GB")
 
-    tokenizer = AutoTokenizer.from_pretrained(BASE_MODEL, trust_remote_code=True)
+    INSTRUCT_MODEL = "Qwen/Qwen3.5-9B"
+    tokenizer = AutoTokenizer.from_pretrained(INSTRUCT_MODEL, trust_remote_code=True)
     tokenizer.pad_token = tokenizer.eos_token
     tokenizer.padding_side = "right"
+
+    # Persist the chat template separately so convert_to_ollama.py can use it
+    # without an internet connection.
+    chat_template_path = Path(LORA_OUTPUT) / "chat_template.jinja"
+    chat_template_path.parent.mkdir(parents=True, exist_ok=True)
+    if tokenizer.chat_template:
+        chat_template_path.write_text(tokenizer.chat_template, encoding="utf-8")
+        print(f"Saved instruct chat template to {chat_template_path}")
 
     bnb_config = BitsAndBytesConfig(
         load_in_4bit=True,

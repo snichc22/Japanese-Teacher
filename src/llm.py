@@ -1,7 +1,12 @@
+import os
 from langchain_ollama import ChatOllama
 
-def get_llm(model: str = "japanese-teacher-ft", temperature: float = 0.7):
-#def get_llm(model: str = "japanese-teacher", temperature: float = 0.7):
+# Ollama model names:
+# japanese-teacher
+# japanese-teacher-ft
+_DEFAULT_MODEL = os.getenv("OLLAMA_MODEL", "japanese-teacher")
+
+def get_llm(model: str = _DEFAULT_MODEL, temperature: float = 0.7):
     return ChatOllama(
         model=model,
         temperature=temperature,

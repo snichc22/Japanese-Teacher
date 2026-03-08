@@ -10,11 +10,12 @@ A bilingual (Japanese/English) AI language teacher powered by a locally-hosted L
 
 1. [Prerequisites](#prerequisites)
 2. [Quick Start](#quick-start)
-3. [Step-by-Step Setup](#step-by-step-setup)
-4. [Running the App](#running-the-app)
-5. [Fine-Tuning (Optional)](#fine-tuning-optional)
-6. [Project Structure](#project-structure)
-7. [My Specs](#my-specs)
+3. [Environment Variables](#environment-variables)
+4. [Step-by-Step Setup](#step-by-step-setup)
+5. [Running the App](#running-the-app)
+6. [Fine-Tuning (Optional)](#fine-tuning-optional)
+7. [Project Structure](#project-structure)
+8. [My Specs](#my-specs)
 
 ---
 
@@ -42,6 +43,23 @@ cd "F:\Personal Projects\Japanese Teacher"
 ```
 
 Then open **http://localhost:7860** in your browser.
+
+> **Note on the URL:** The app binds to `0.0.0.0` (all interfaces) but you must open **`http://localhost:7860`** in your browser. 
+> `http://0.0.0.0:7860` is not a valid browser URL on Windows.
+
+---
+
+## Environment Variables
+
+Configuration is loaded from `.env.teacher` in the project root. Copy `.envTemplate` to `.env.teacher` and fill in your values.
+
+| Variable | Required | Default | Description |
+|---|---|---|---|
+| `HF_TOKEN` | No | *(empty)* | HuggingFace API token for downloading models during fine-tuning. Get one at [huggingface.co/settings/tokens](https://huggingface.co/settings/tokens). |
+| `OLLAMA_MODEL` | No | `japanese-teacher-ft` | Ollama model name used by the agent. Must support tool-calling. Both `japanese-teacher` and `japanese-teacher-ft` are valid after running the full pipeline. |
+| `DOCUMENT_DIR` | No | `documents` | Folder where uploaded PDFs / `.txt` / `.md` learning materials are stored for RAG. |
+| `VECTORSTORE_DIR` | No | `vectorstore` | Folder where the ChromaDB vector-store index is persisted. |
+| `EMBEDDING_DEVICE` | No | *(auto)* | Device for HuggingFace embeddings. `cuda` forces GPU, `cpu` forces CPU. Leave blank to auto-detect. |
 
 ---
 
@@ -132,9 +150,10 @@ python train.py
 ```
 
 This will:
-- Download the `Qwen/Qwen3.5-9B-Base` model from HuggingFace
-- Fine-tune it using QLoRA (4-bit quantization + LoRA)
+- Download `Qwen/Qwen3.5-9B-Instruct` tokenizer (for its chat template) and `Qwen/Qwen3.5-9B-Base` weights
+- Fine-tune using QLoRA (4-bit quantization + LoRA)
 - Save the LoRA adapter to `finetune/lora_adapter/`
+- Save the full instruct chat template to `finetune/lora_adapter/chat_template.jinja`
 - Save checkpoints to `finetune/output/`
 
 **Training config:** batch size 4, gradient accumulation 8, 3 epochs, cosine LR schedule, bfloat16.
@@ -158,19 +177,16 @@ python convert_to_ollama.py
 
 This will:
 1. Merge the LoRA adapter with the base model → `finetune/merged_model/`
-2. Convert the merged model to GGUF format → `finetune/merged_model.gguf`
-3. Generate `Modelfile.finetuned`
-4. Create an Ollama model named `japanese-teacher-ft`
+2. **Inject the Qwen3.5-Instruct chat template** into the merged model's tokenizer config — this is what enables tool-calling, thinking mode, and vision support in the fine-tuned model
+3. Convert the merged model to GGUF format → `finetune/merged_model.gguf`
+4. Generate `Modelfile.finetuned`
+5. Create an Ollama model named `japanese-teacher-ft`
 
 ### 4. Use the Fine-Tuned Model
 
-To use the fine-tuned model instead of the base model, update the model name in [`src/llm.py`](src/llm.py):
+The fine-tuned model is selected via the `OLLAMA_MODEL` variable in `.env.teacher` (defaults to `japanese-teacher-ft`). No code changes needed.
 
-```python
-def get_llm(model: str = "japanese-teacher-ft", temperature: float = 0.7):
-```
-
-Or run it directly with Ollama:
+Run it directly with Ollama to test:
 
 ```powershell
 ollama run japanese-teacher-ft

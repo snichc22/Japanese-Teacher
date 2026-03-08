@@ -7,9 +7,18 @@
 # -----------------------------------------------------------------------------
 # HuggingFace
 # -----------------------------------------------------------------------------
-# Required for downloading gated models (e.g. Qwen/Qwen3.5-9B-Base) during
+# Optional for downloading gated models (e.g. Qwen/Qwen3.5-9B-Base) during
 # fine-tuning. Generate a token at https://huggingface.co/settings/tokens
 HF_TOKEN=
+
+# -----------------------------------------------------------------------------
+# Ollama / LLM  (src/llm.py)
+# -----------------------------------------------------------------------------
+# The Ollama model name used by the agent. Must support tool-calling.
+# After running the full fine-tune pipeline, "japanese-teacher-ft" supports
+# tools via the injected Qwen3.5-Instruct chat template.
+# Use "japanese-teacher" to fall back to the base model at any time.
+OLLAMA_MODEL=japanese-teacher-ft
 
 # -----------------------------------------------------------------------------
 # RAG / Document Storage  (src/rag.py)

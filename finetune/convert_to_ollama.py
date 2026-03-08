@@ -1,3 +1,4 @@
+import json
 import subprocess
 import shutil
 import sys
@@ -14,6 +15,10 @@ PROJECT_ROOT = SCRIPT_DIR.parent
 load_dotenv(PROJECT_ROOT / ".env.teacher")
 
 BASE_MODEL = "Qwen/Qwen3.5-9B-Base"
+# The instruct variant has the full chat template (tool-calling, thinking, vision).
+# Qwen3.5 naming: "Qwen3.5-9B" = instruct, "Qwen3.5-9B-Base" = base (no -Instruct suffix).
+# Only used to copy the chat template into the merged model — no weights are taken from it.
+INSTRUCT_MODEL = "Qwen/Qwen3.5-9B"
 LORA_ADAPTER = "lora_adapter"
 MERGED_OUTPUT = "merged_model"
 GGUF_OUTPUT = "merged_model.gguf"
@@ -33,6 +38,49 @@ def find_llama_cpp_converter():
             return [sys.executable, str(p.resolve())]
 
     return None
+
+
+def inject_chat_template(merged_output_dir: Path):
+    tokenizer_config_path = merged_output_dir / "tokenizer_config.json"
+    if not tokenizer_config_path.exists():
+        print("WARNING: tokenizer_config.json not found in merged model directory.")
+        return
+
+    local_jinja = SCRIPT_DIR / LORA_ADAPTER / "chat_template.jinja"
+    chat_template: str | None = None
+
+    if local_jinja.exists():
+        chat_template = local_jinja.read_text(encoding="utf-8")
+        print(f"Using chat template from {local_jinja}")
+    else:
+        print(f"Local chat_template.jinja not found; downloading from {INSTRUCT_MODEL}...")
+        try:
+            instruct_tok = AutoTokenizer.from_pretrained(
+                INSTRUCT_MODEL, trust_remote_code=True
+            )
+            chat_template = instruct_tok.chat_template
+
+            local_jinja.parent.mkdir(parents=True, exist_ok=True)
+            local_jinja.write_text(chat_template or "", encoding="utf-8")
+            print(f"Saved chat template to {local_jinja}")
+        except Exception as e:
+            print(f"WARNING: Could not load instruct tokenizer: {e}")
+            print("Tool-calling will NOT be available in the fine-tuned model.")
+            return
+
+    if not chat_template:
+        print("WARNING: chat_template is empty — skipping injection.")
+        return
+
+    with open(tokenizer_config_path, "r", encoding="utf-8") as f:
+        config = json.load(f)
+
+    config["chat_template"] = chat_template
+
+    with open(tokenizer_config_path, "w", encoding="utf-8") as f:
+        json.dump(config, f, ensure_ascii=False, indent=2)
+
+    print("✅ Chat template injected into tokenizer_config.json — tool-calling enabled.")
 
 
 def merge_and_export():
@@ -61,9 +109,11 @@ def merge_and_export():
     model.save_pretrained(MERGED_OUTPUT)
     tokenizer.save_pretrained(MERGED_OUTPUT)
 
+    # --- Inject the instruct chat template so the GGUF supports tool-calling ---
+    inject_chat_template(SCRIPT_DIR / MERGED_OUTPUT)
+
     # --- Convert to GGUF format ---
     # Ollama cannot directly import Qwen3.5 safetensors (unsupported architecture).
-    # We must convert to GGUF first using llama.cpp's converter.
     print(f"Converting merged model to GGUF format (outtype={GGUF_OUTTYPE})...")
     gguf_path = Path(GGUF_OUTPUT)
 
@@ -96,10 +146,12 @@ def merge_and_export():
     print(f"GGUF conversion complete: {gguf_path}")
 
     modelfile_content = f"""FROM finetune/{gguf_path}
-    
+
 PARAMETER temperature 0.7
-PARAMETER num_ctx 8192
+PARAMETER num_ctx 32768
 PARAMETER num_gpu 99
+PARAMETER stop "<|im_end|>"
+PARAMETER stop "<|endoftext|>"
 
 SYSTEM \"\"\"
 You are a billingual language teacher fluent in both Japanese (日本語) and English.
