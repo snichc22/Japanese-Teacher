@@ -146,9 +146,12 @@ def merge_and_export():
     print(f"GGUF conversion complete: {gguf_path}")
 
     modelfile_content = f"""FROM finetune/{gguf_path}
+    
+RENDERER qwen3.5
+PARSER qwen3.5
 
 PARAMETER temperature 0.7
-PARAMETER num_ctx 32768
+PARAMETER num_ctx 16384
 PARAMETER num_gpu 99
 PARAMETER stop "<|im_end|>"
 PARAMETER stop "<|endoftext|>"

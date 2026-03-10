@@ -33,8 +33,8 @@ def _get_rag_tool():
     except Exception:
         return None
 
-def create_agent():
-    llm = get_llm()
+def create_agent(reasoning: bool | None = False):
+    llm = get_llm(reasoning=reasoning)
     tools = [get_search_tool()]
     rag_tool = _get_rag_tool()
 
@@ -44,7 +44,7 @@ def create_agent():
     prompt = ChatPromptTemplate.from_messages([
         ("system", SYSTEM_PROMPT),
         MessagesPlaceholder(variable_name="chat_history"),
-        ("human", "{input}"),
+        MessagesPlaceholder(variable_name="input"),
         MessagesPlaceholder(variable_name="agent_scratchpad")
     ])
 
