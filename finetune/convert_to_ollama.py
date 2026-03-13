@@ -15,9 +15,6 @@ PROJECT_ROOT = SCRIPT_DIR.parent
 load_dotenv(PROJECT_ROOT / ".env.teacher")
 
 BASE_MODEL = "Qwen/Qwen3.5-9B-Base"
-# The instruct variant has the full chat template (tool-calling, thinking, vision).
-# Qwen3.5 naming: "Qwen3.5-9B" = instruct, "Qwen3.5-9B-Base" = base (no -Instruct suffix).
-# Only used to copy the chat template into the merged model — no weights are taken from it.
 INSTRUCT_MODEL = "Qwen/Qwen3.5-9B"
 LORA_ADAPTER = "lora_adapter"
 MERGED_OUTPUT = "merged_model"
@@ -113,7 +110,7 @@ def merge_and_export():
     inject_chat_template(SCRIPT_DIR / MERGED_OUTPUT)
 
     # --- Convert to GGUF format ---
-    # Ollama cannot directly import Qwen3.5 safetensors (unsupported architecture).
+    # Ollama cannot directly import Qwen3.5 safetensors
     print(f"Converting merged model to GGUF format (outtype={GGUF_OUTTYPE})...")
     gguf_path = Path(GGUF_OUTPUT)
 

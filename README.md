@@ -56,7 +56,7 @@ Configuration is loaded from `.env.teacher` in the project root. Copy `.envTempl
 | Variable | Required | Default | Description |
 |---|---|---|---|
 | `HF_TOKEN` | No | *(empty)* | HuggingFace API token for downloading models during fine-tuning. Get one at [huggingface.co/settings/tokens](https://huggingface.co/settings/tokens). |
-| `OLLAMA_MODEL` | No | `japanese-teacher-ft` | Ollama model name used by the agent. Must support tool-calling. Both `japanese-teacher` and `japanese-teacher-ft` are valid after running the full pipeline. |
+| `OLLAMA_MODEL` | No | `japanese-teacher` | Ollama model name used by the agent. Must support tool-calling. Both `japanese-teacher` and `japanese-teacher-ft` are valid after running the full pipeline. |
 | `DOCUMENT_DIR` | No | `documents` | Folder where uploaded PDFs / `.txt` / `.md` learning materials are stored for RAG. |
 | `VECTORSTORE_DIR` | No | `vectorstore` | Folder where the ChromaDB vector-store index is persisted. |
 | `EMBEDDING_DEVICE` | No | *(auto)* | Device for HuggingFace embeddings. `cuda` forces GPU, `cpu` forces CPU. Leave blank to auto-detect. |
