@@ -18,10 +18,13 @@
 #  OUT OF OR IN CONNECTION WITH THE SOFTWARE OR THE USE OR OTHER DEALINGS IN THE
 #  SOFTWARE.
 
+import os
+
 from langchain_classic.agents import create_tool_calling_agent, AgentExecutor
 from langchain_core.prompts import ChatPromptTemplate, MessagesPlaceholder
 from langchain_core.tools import Tool
 
+from src.config import load_env
 from src.llm import get_llm
 from src.prompts import SYSTEM_PROMPT
 from src.rag import get_retriever
@@ -54,6 +57,7 @@ def _get_rag_tool():
         return None
 
 def create_agent(reasoning: bool | None = False):
+    load_env()
     llm = get_llm(reasoning=reasoning)
     tools = [get_search_tool()]
     rag_tool = _get_rag_tool()
@@ -73,7 +77,8 @@ def create_agent(reasoning: bool | None = False):
     return AgentExecutor(
         agent=agent,
         tools=tools,
-        verbose=True,
-        max_iterations=5,
-        handle_parsing_errors=True
+        verbose=os.getenv("AGENT_VERBOSE", "true").lower() == "true",
+        max_iterations=int(os.getenv("AGENT_MAX_ITERATIONS", "2")),
+        early_stopping_method="generate",
+        handle_parsing_errors=True,
     )

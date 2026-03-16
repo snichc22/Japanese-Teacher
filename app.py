@@ -24,15 +24,17 @@ import shutil
 from pathlib import Path
 
 import gradio as gr
-from dotenv import load_dotenv
 from langchain_core.messages import AIMessage, HumanMessage
+
+from src.config import load_env
+
+load_env()
 
 from src.agent import create_agent
 from src.rag import DOCUMENT_DIR, ingest_documents
 
-load_dotenv(".env.teacher")
-
 _agent_cache: dict = {"reasoning": False, "agent": None}
+_MAX_HISTORY_TURNS = int(os.getenv("CHAT_HISTORY_TURNS", "6"))
 
 def _get_agent(reasoning: bool):
     if _agent_cache["agent"] is None or _agent_cache["reasoning"] != reasoning:
@@ -62,6 +64,21 @@ def _encode_image_to_data_url(path: str) -> str:
 def _is_image(path: str) -> bool:
     return Path(path).suffix.lower() in _IMAGE_EXTENSIONS
 
+def _normalize_history_content(content) -> str:
+    if isinstance(content, str):
+        return content
+    if isinstance(content, (list, tuple)):
+        parts: list[str] = []
+        for part in content:
+            if isinstance(part, str):
+                parts.append(part)
+            elif hasattr(part, "path"):
+                parts.append(f"[Image: {Path(part.path).name}]")
+        return "\n".join(p for p in parts if p).strip()
+    if hasattr(content, "path"):
+        return f"[Image: {Path(content.path).name}]"
+    return str(content)
+
 def respond(message: dict, chat_history: list, thinking_enabled: bool):
     text: str = message.get("text", "").strip()
     files: list[str] = message.get("files", [])
@@ -69,8 +86,6 @@ def respond(message: dict, chat_history: list, thinking_enabled: bool):
     images = [f for f in files if _is_image(f)]
 
     content_blocks: list[dict] = []
-
-    print(images)
 
     for img_path in images:
         content_blocks.append(
@@ -88,7 +103,8 @@ def respond(message: dict, chat_history: list, thinking_enabled: bool):
         return
 
     lc_history: list = []
-    for msg in chat_history:
+    recent_history = chat_history[-(_MAX_HISTORY_TURNS * 2):]
+    for msg in recent_history:
         if msg["role"] == "user":
             lc_history.append(HumanMessage(content=msg["content"]))
         elif msg["role"] == "assistant":

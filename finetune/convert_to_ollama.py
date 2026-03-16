@@ -19,6 +19,7 @@
 #  SOFTWARE.
 
 import json
+import os
 import subprocess
 import shutil
 import sys
@@ -39,7 +40,7 @@ INSTRUCT_MODEL = "Qwen/Qwen3.5-9B"
 LORA_ADAPTER = "lora_adapter"
 MERGED_OUTPUT = "merged_model"
 GGUF_OUTPUT = "merged_model.gguf"
-GGUF_OUTTYPE = "f16"
+GGUF_OUTTYPE = os.getenv("GGUF_OUTTYPE", "q8_0")
 
 def find_llama_cpp_converter():
     converter = shutil.which("convert_hf_to_gguf")
@@ -168,7 +169,8 @@ RENDERER qwen3.5
 PARSER qwen3.5
 
 PARAMETER temperature 0.7
-PARAMETER num_ctx 16384
+PARAMETER num_ctx 8192
+PARAMETER num_predict 512
 PARAMETER num_gpu 99
 PARAMETER stop "<|im_end|>"
 PARAMETER stop "<|endoftext|>"

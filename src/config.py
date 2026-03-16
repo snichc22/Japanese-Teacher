@@ -1,15 +1,15 @@
 #  Copyright (c) 2026 Schnitzer Christoph. All rights reserved.
-#
+# 
 #  Permission is hereby granted, free of charge, to any person obtaining a copy
 #  of this software and associated documentation files (the "Software"), to deal
 #  in the Software without restriction, including without limitation the rights
 #  to use, copy, modify, merge, publish, distribute, sublicense, and/or sell
 #  copies of the Software, and to permit persons to whom the Software is
 #  furnished to do so, subject to the following conditions:
-#
+# 
 #  The above copyright notice and this permission notice shall be included in all
 #  copies or substantial portions of the Software.
-#
+# 
 #  THE SOFTWARE IS PROVIDED "AS IS", WITHOUT WARRANTY OF ANY KIND, EXPRESS OR
 #  IMPLIED, INCLUDING BUT NOT LIMITED TO THE WARRANTIES OF MERCHANTABILITY,
 #  FITNESS FOR A PARTICULAR PURPOSE AND NONINFRINGEMENT. IN NO EVENT SHALL THE
@@ -18,38 +18,16 @@
 #  OUT OF OR IN CONNECTION WITH THE SOFTWARE OR THE USE OR OTHER DEALINGS IN THE
 #  SOFTWARE.
 
-import os
-from langchain_ollama import ChatOllama
+from functools import lru_cache
+from pathlib import Path
 
-from src.config import load_env
-
-load_env()
+from dotenv import load_dotenv
 
 
-def _env_int(name: str, default: int) -> int:
-    value = os.getenv(name, str(default)).strip()
-    try:
-        return int(value)
-    except ValueError:
-        return default
+@lru_cache(maxsize=1)
+def load_env() -> None:
+    project_root = Path(__file__).resolve().parent.parent
+    load_dotenv(project_root / ".env", override=False)
+    load_dotenv(project_root / ".env.teacher", override=True)
 
-def get_llm(
-    model: str | None = None,
-    temperature: float = 0.7,
-    reasoning: bool | None = False,
-):
-    load_env()
-    resolved_model = model or os.getenv("OLLAMA_MODEL", "japanese-teacher-ft")
-    resolved_num_ctx = _env_int("OLLAMA_NUM_CTX", 8192)
-    resolved_num_predict = _env_int("OLLAMA_NUM_PREDICT", 512)
 
-    print("Model in use:", resolved_model)
-
-    return ChatOllama(
-        model=resolved_model,
-        temperature=temperature,
-        num_ctx=resolved_num_ctx,
-        num_predict=resolved_num_predict,
-        keep_alive=os.getenv("OLLAMA_KEEP_ALIVE", "30m"),
-        reasoning=reasoning,
-    )

@@ -19,6 +19,33 @@ HF_TOKEN=
 # tools via the injected Qwen3.5-Instruct chat template.
 # Use "japanese-teacher" to fall back to the base model at any time.
 OLLAMA_MODEL=japanese-teacher
+OLLAMA_NUM_CTX=8192
+OLLAMA_NUM_PREDICT=512
+OLLAMA_KEEP_ALIVE=30m
+
+# -----------------------------------------------------------------------------
+# Agent / Tooling  (src/agent.py, src/search.py, app.py)
+# -----------------------------------------------------------------------------
+AGENT_VERBOSE=false
+AGENT_MAX_ITERATIONS=2
+
+# Maximum number of web results fetched from DuckDuckGo per tool call.
+SEARCH_MAX_RESULTS=5
+
+# Number of top search results summarized into the prompt.
+SEARCH_MAX_RETURNED_RESULTS=3
+
+# Max characters kept per search snippet in tool output.
+SEARCH_MAX_SNIPPET_CHARS=220
+
+# Number of conversation turns (user+assistant pairs) kept in prompt history.
+CHAT_HISTORY_TURNS=6
+
+# -----------------------------------------------------------------------------
+# Fine-tune export  (finetune/convert_to_ollama.py)
+# -----------------------------------------------------------------------------
+# q8_0 is much faster than f16 on many local setups while keeping good quality.
+GGUF_OUTTYPE=q8_0
 
 # -----------------------------------------------------------------------------
 # RAG / Document Storage  (src/rag.py)

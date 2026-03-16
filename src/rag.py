@@ -26,6 +26,10 @@ from langchain_community.vectorstores import Chroma
 from langchain_huggingface import HuggingFaceEmbeddings
 from langchain_text_splitters import RecursiveCharacterTextSplitter
 
+from src.config import load_env
+
+load_env()
+
 DOCUMENT_DIR = os.getenv("DOCUMENT_DIR", "documents")
 VECTORSTORE_DIR = os.getenv("VECTORSTORE_DIR", "vectorstore")
 

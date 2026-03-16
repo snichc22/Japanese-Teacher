@@ -18,11 +18,14 @@
 #  OUT OF OR IN CONNECTION WITH THE SOFTWARE OR THE USE OR OTHER DEALINGS IN THE
 #  SOFTWARE.
 
+import os
 import re
 
 from langchain_community.tools import DuckDuckGoSearchResults
 from langchain_community.utilities import DuckDuckGoSearchAPIWrapper
 from langchain_core.tools import Tool
+
+from src.config import load_env
 
 # Domains with unwanted language results (Change if you want to allow any of these)
 _BLOCKED_TLD_PATTERN = re.compile(
@@ -34,6 +37,14 @@ _BLOCKED_TLD_PATTERN = re.compile(
 
 _ALLOWED_LANG_TLDS = {".jp", ".de", ".com", ".org", ".net", ".edu", ".gov", ".co.uk", ".io"}
 
+load_env()
+
+def _env_int(name: str, default: int) -> int:
+    value = os.getenv(name, str(default)).strip()
+    try:
+        return int(value)
+    except ValueError:
+        return default
 
 def _filter_results(results: list[dict]) -> list[dict]:
     filtered = []
@@ -44,15 +55,36 @@ def _filter_results(results: list[dict]) -> list[dict]:
         filtered.append(r)
     return filtered if filtered else results
 
+def _truncate(text: str, limit: int) -> str:
+    text = re.sub(r"\s+", " ", text or "").strip()
+    if len(text) <= limit:
+        return text
+    return f"{text[: limit - 3].rstrip()}..."
+
+def _format_results(results: list[dict], max_returned_results: int, max_snippet_chars: int) -> str:
+    rows: list[str] = []
+    for idx, item in enumerate(results[:max_returned_results], start=1):
+        title = _truncate(item.get("title", "Untitled"), 120)
+        link = item.get("link", "")
+        snippet = _truncate(item.get("snippet", ""), max_snippet_chars)
+        rows.append(f"{idx}. {title}\nURL: {link}\nSnippet: {snippet}")
+    if not rows:
+        return "No useful search results found."
+    return "\n\n".join(rows)
 
 def get_search_tool():
+    load_env()
+    max_returned_results = _env_int("SEARCH_MAX_RETURNED_RESULTS", 3)
+    max_snippet_chars = _env_int("SEARCH_MAX_SNIPPET_CHARS", 220)
+    max_results = _env_int("SEARCH_MAX_RESULTS", 5)
+
     wrapper = DuckDuckGoSearchAPIWrapper(
-        max_results=8,
+        max_results=max_results,
         backend="auto",
     )
     ddg_search = DuckDuckGoSearchResults(
         api_wrapper=wrapper,
-        num_results=8,
+        num_results=max_results,
         output_format="list",
     )
 
@@ -60,7 +92,7 @@ def get_search_tool():
         try:
             raw = ddg_search.run(query)
             if isinstance(raw, list):
-                return str(_filter_results(raw)[:5])
+                return _format_results(_filter_results(raw), max_returned_results, max_snippet_chars)
             return raw
         except Exception as e:
             return f"Search failed: {e}. Please try rephrasing the query or answer from your own knowledge."
