@@ -114,8 +114,6 @@ def merge_and_export():
     )
     tokenizer = AutoTokenizer.from_pretrained(BASE_MODEL, trust_remote_code=True)
 
-    # Workaround: transformers 5.x stores _no_split_modules as a set, but
-    # accelerate 1.13 chokes on it in get_balanced_memory(). Flatten to list.
     if hasattr(model, "_no_split_modules") and isinstance(model._no_split_modules, set):
         model._no_split_modules = list(model._no_split_modules)
 
@@ -127,11 +125,8 @@ def merge_and_export():
     model.save_pretrained(MERGED_OUTPUT)
     tokenizer.save_pretrained(MERGED_OUTPUT)
 
-    # --- Inject the instruct chat template so the GGUF supports tool-calling ---
     inject_chat_template(SCRIPT_DIR / MERGED_OUTPUT)
 
-    # --- Convert to GGUF format ---
-    # Ollama cannot directly import Qwen3.5 safetensors
     print(f"Converting merged model to GGUF format (outtype={GGUF_OUTTYPE})...")
     gguf_path = Path(GGUF_OUTPUT)
 

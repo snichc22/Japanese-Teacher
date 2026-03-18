@@ -13,9 +13,10 @@ A bilingual (Japanese/English) AI language teacher powered by a locally-hosted L
 3. [Environment Variables](#environment-variables)
 4. [Step-by-Step Setup](#step-by-step-setup)
 5. [Running the App](#running-the-app)
-6. [Fine-Tuning (Optional)](#fine-tuning-optional)
-7. [Project Structure](#project-structure)
-8. [My Specs](#my-specs)
+6. [Launch from Windows Search](#launch-from-windows-search)
+7. [Fine-Tuning (Optional)](#fine-tuning-optional)
+8. [Project Structure](#project-structure)
+9. [My Specs](#my-specs)
 
 ---
 
@@ -125,6 +126,39 @@ ollama serve
 .\.venv\Scripts\Activate.ps1
 python app.py
 ```
+
+---
+
+## Launch from Windows Search
+
+Create a Start Menu shortcut once, then launch the app by typing its name in Windows Search.
+
+```powershell
+.\scripts\create_windows_search_shortcut.ps1
+```
+
+Optional: customize the search name shown in Windows Search.
+
+```powershell
+.\scripts\create_windows_search_shortcut.ps1 -ShortcutName "Japanese Teacher AI"
+```
+
+By default, the script uses `icon.png` from the project root and converts it to `icon.ico` for the Windows shortcut.
+
+```powershell
+.\scripts\create_windows_search_shortcut.ps1 -IconPath ".\icon.png"
+```
+
+Attribution: `image: Flaticon.com`. This icon uses is from Flaticon.com.
+
+After creating the shortcut:
+1. Press `Win`
+2. Type `Japanese Teacher` (or your custom name)
+3. Launch the result
+
+This creates a `.lnk` file in:
+
+`%APPDATA%\Microsoft\Windows\Start Menu\Programs`
 
 ---
 
