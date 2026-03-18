@@ -11,6 +11,8 @@ $shortcutPath = Join-Path $programsDir ("{0}.lnk" -f $ShortcutName)
 $defaultIconLocation = "$env:SystemRoot\System32\shell32.dll,220"
 $projectIconPng = Join-Path $projectRoot "icon.png"
 $projectIconIco = Join-Path $projectRoot "icon.ico"
+$venvPython = Join-Path $projectRoot ".venv\Scripts\python.exe"
+$pythonCommand = if (Test-Path $venvPython) { $venvPython } else { "python" }
 
 if (-not (Test-Path $runScript)) {
     Write-Error "run.ps1 was not found at $runScript"
@@ -25,34 +27,57 @@ function Convert-ImageToIco {
         [string]$IcoPath
     )
 
-    Add-Type -AssemblyName System.Drawing
-    if (-not ("NativeIcon" -as [type])) {
-        Add-Type @"
-using System;
-using System.Runtime.InteropServices;
-public static class NativeIcon {
-    [DllImport("user32.dll", SetLastError = true)]
-    public static extern bool DestroyIcon(IntPtr hIcon);
-}
-"@
-    }
+    $pythonScriptPath = [System.IO.Path]::GetTempFileName() + ".py"
+    $pythonScript = @"
+from PIL import Image
+import sys
 
-    $bitmap = New-Object System.Drawing.Bitmap($ImagePath)
-    $hIcon = [IntPtr]::Zero
-    $icon = $null
-    $stream = $null
+src = sys.argv[1]
+dst = sys.argv[2]
+
+img = Image.open(src).convert("RGBA")
+w, h = img.size
+size = max(w, h)
+canvas = Image.new("RGBA", (size, size), (0, 0, 0, 0))
+canvas.paste(img, ((size - w) // 2, (size - h) // 2))
+
+sizes = [(256, 256), (128, 128), (64, 64), (48, 48), (32, 32), (24, 24), (16, 16)]
+canvas.save(dst, format="ICO", sizes=sizes)
+"@
 
     try {
-        $hIcon = $bitmap.GetHicon()
-        $icon = [System.Drawing.Icon]::FromHandle($hIcon)
-        $stream = New-Object System.IO.FileStream($IcoPath, [System.IO.FileMode]::Create)
-        $icon.Save($stream)
+        Set-Content -Path $pythonScriptPath -Value $pythonScript -Encoding UTF8
+        & $pythonCommand $pythonScriptPath $ImagePath $IcoPath
+        if ($LASTEXITCODE -ne 0) {
+            throw "Python icon conversion failed with exit code $LASTEXITCODE"
+        }
     }
     finally {
-        if ($stream) { $stream.Dispose() }
+        Remove-Item $pythonScriptPath -ErrorAction SilentlyContinue
+    }
+}
+
+function Test-IcoFile {
+    param(
+        [Parameter(Mandatory = $true)]
+        [string]$IcoPath
+    )
+
+    if (-not (Test-Path $IcoPath)) {
+        return $false
+    }
+
+    try {
+        Add-Type -AssemblyName System.Drawing
+        $icon = New-Object System.Drawing.Icon($IcoPath)
+        $null = $icon.Handle
+        return $icon.Width -gt 0 -and $icon.Height -gt 0
+    }
+    catch {
+        return $false
+    }
+    finally {
         if ($icon) { $icon.Dispose() }
-        if ($hIcon -ne [IntPtr]::Zero) { [NativeIcon]::DestroyIcon($hIcon) | Out-Null }
-        $bitmap.Dispose()
     }
 }
 
@@ -70,14 +95,26 @@ if ($IconPath) {
 
     $extension = [System.IO.Path]::GetExtension($resolvedIconPath).ToLowerInvariant()
     if ($extension -eq ".ico") {
-        $iconLocation = $resolvedIconPath
+        $iconLocation = "$resolvedIconPath,0"
     }
     elseif ($extension -eq ".dll" -or $extension -eq ".exe") {
         $iconLocation = "$resolvedIconPath,$IconIndex"
     }
     elseif ($extension -eq ".png" -or $extension -eq ".jpg" -or $extension -eq ".jpeg" -or $extension -eq ".bmp") {
-        Convert-ImageToIco -ImagePath $resolvedIconPath -IcoPath $projectIconIco
-        $iconLocation = $projectIconIco
+        try {
+            Convert-ImageToIco -ImagePath $resolvedIconPath -IcoPath $projectIconIco
+        }
+        catch {
+            Write-Error "Failed to convert image to icon. Ensure Pillow is installed for '$pythonCommand'. Error: $($_.Exception.Message)"
+            exit 1
+        }
+
+        if (-not (Test-IcoFile -IcoPath $projectIconIco)) {
+            Write-Error "Failed to generate a valid icon file at $projectIconIco"
+            exit 1
+        }
+
+        $iconLocation = "$projectIconIco,0"
     }
     else {
         Write-Error "Unsupported icon format '$extension'. Use .png, .jpg, .jpeg, .bmp, .ico, .dll, or .exe."
